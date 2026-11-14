@@ -1,0 +1,54 @@
+name: reshis-avia
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    container_name: ${BACKEND_CONTAINER:-app-cu}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      SECRET_KEY: ${SECRET_KEY:-reshis-avia-local-secret-key}
+    volumes:
+      - ./data:/app/data
+    networks:
+      - reshis_net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+    container_name: ${NGINX_CONTAINER:-nginx-cu}
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-127.0.0.1:8081}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - reshis_net
+      - proxy_net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+networks:
+  reshis_net:
+    name: reshis_avia_network
+    driver: bridge
+  proxy_net:
+    external: true
+    name: ${PROXY_NETWORK:-my_proxy_network}
